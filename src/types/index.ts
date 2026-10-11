@@ -36,6 +36,22 @@ export interface Skill {
   sortOrder: number
 }
 
+export interface ConversationChoice {
+  id: string
+  question: string
+  shortLabel: string
+  response: string
+  targetSectionId?: string
+}
+
+export interface ChatMessage {
+  id: string
+  sender: 'user' | 'chethan'
+  text: string
+  timestamp?: string
+  targetSectionId?: string
+}
+
 export interface DialogueTopic {
   id: string
   label: string
@@ -48,7 +64,10 @@ export interface DialogueConfig {
   characterName: string
   greetingScript: string
   topics: DialogueTopic[]
+  conversationChoices: ConversationChoice[]
+  fallbackResponse: string
 }
+
 
 export type ProjectStatus = 'Concept' | 'Prototype' | 'In Development' | 'Planned'
 
