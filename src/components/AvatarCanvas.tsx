@@ -27,7 +27,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
 
   const [loading, setLoading] = useState<boolean>(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'3d' | 'portrait'>('3d')
+  const [viewMode, setViewMode] = useState<'3d' | 'portrait'>('portrait')
 
   // Keep latest isSpeaking in ref for animation loop
   const isSpeakingRef = useRef<boolean>(isSpeaking)
@@ -93,12 +93,35 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
     const scene = new THREE.Scene()
     sceneRef.current = scene
 
-    // 2. Camera: Framed around chest and head
+    // 2. Camera: Framed around chest and head (Medium Portrait Composition)
     const width = container.clientWidth || 280
     const height = container.clientHeight || 360
-    const camera = new THREE.PerspectiveCamera(28, width / height, 0.1, 20)
-    camera.position.set(0, 1.48, 1.15)
-    camera.lookAt(0, 1.42, 0)
+    const camera = new THREE.PerspectiveCamera(30, width / height, 0.1, 20)
+
+    // Model rig dimensions from GLB:
+    // Head bone is at Y = 1.638m, top of hair is at Y = 1.865m, neck is at Y = 1.52m, chest/shoulders at Y = 1.25-1.37m
+    // Center portrait framing around eyes / upper torso (Y = 1.58m)
+    const TARGET_CENTER_Y = 1.58
+    const DESIRED_VISIBLE_HEIGHT = 0.88 // 1.14m (shoulders/chest) to 2.02m (well above hair at 1.865m with headroom)
+    const DESIRED_VISIBLE_WIDTH = 0.58  // 0.50m shoulder span with margins
+
+    const updateCameraFraming = (w: number, h: number) => {
+      const aspect = w / h
+      camera.aspect = aspect
+
+      const fovRad = (camera.fov * Math.PI) / 180
+      const tanHalfFov = Math.tan(fovRad / 2)
+
+      const distV = DESIRED_VISIBLE_HEIGHT / (2 * tanHalfFov)
+      const distH = DESIRED_VISIBLE_WIDTH / (2 * tanHalfFov * aspect)
+      const distance = Math.max(distV, distH, 1.62)
+
+      camera.position.set(0, TARGET_CENTER_Y, distance)
+      camera.lookAt(0, TARGET_CENTER_Y, 0)
+      camera.updateProjectionMatrix()
+    }
+
+    updateCameraFraming(width, height)
 
     // 3. WebGL Renderer
     let renderer: THREE.WebGLRenderer
@@ -205,8 +228,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       if (!container || !renderer) return
       const w = container.clientWidth || 280
       const h = container.clientHeight || 360
-      camera.aspect = w / h
-      camera.updateProjectionMatrix()
+      updateCameraFraming(w, h)
       renderer.setSize(w, h)
     })
     resizeObserver.observe(container)
@@ -363,7 +385,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
-        className={`relative w-48 h-60 sm:w-56 sm:h-72 rounded-xl overflow-hidden border-2 transition-all duration-300 bg-gradient-to-b from-[#141829] via-[#0c0e1a] to-black select-none cursor-grab active:cursor-grabbing ${
+        className={`relative w-48 h-64 sm:w-56 sm:h-76 rounded-xl overflow-hidden border-2 transition-all duration-300 bg-gradient-to-b from-[#141829] via-[#0c0e1a] to-black select-none cursor-grab active:cursor-grabbing ${
           isSpeaking ? 'border-amber-400 animate-speaking-glow' : 'border-amber-500/40 shadow-2xl'
         }`}
       >
@@ -372,17 +394,17 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
           <canvas
             ref={canvasRef}
             className="w-full h-full block focus:outline-none"
-            aria-label="3D Interactive Talking Avatar of Chethan S"
+            aria-label="3D Interactive Humanoid Avatar Rig"
           />
         )}
 
-        {/* View Mode 2 or Fallback: Illustrated Portrait */}
+        {/* View Mode 2 or Fallback: Chethan S Verified Illustrated Portrait */}
         {(viewMode === 'portrait' || loadError) && (
           <div className="w-full h-full relative">
             <img
               src={fallbackImageUrl}
-              alt={`Portrait of ${characterName}`}
-              className="w-full h-full object-cover filter brightness-105 animate-character-breath"
+              alt={`Verified Portrait of ${characterName}`}
+              className="w-full h-full object-cover object-top filter brightness-105 animate-character-breath select-none"
             />
             {loadError && (
               <div className="absolute top-2 inset-x-2 py-1 px-2 bg-black/85 backdrop-blur-sm rounded border border-amber-500/50 flex items-center gap-1.5 text-[10px] font-mono text-amber-300">
@@ -420,21 +442,22 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
           <div className="absolute bottom-2.5 inset-x-2.5 py-1 px-2 bg-black/80 backdrop-blur-sm rounded border border-slate-700/80 flex items-center justify-center gap-1.5 z-20 pointer-events-none">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
             <span className="text-[10px] font-mono text-slate-300 tracking-wider">
-              {viewMode === '3d' ? '3D RIG ONLINE // READY' : 'PORTRAIT // READY'}
+              {viewMode === '3d' ? '3D RIG // PROCEDURAL DEMO' : 'CHETHAN S // VERIFIED PORTRAIT'}
             </span>
           </div>
         )}
 
         {/* 3D Drag cue icon */}
         {viewMode === '3d' && !loading && !loadError && (
-          <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/60 border border-slate-700 text-[9px] font-mono text-slate-400 pointer-events-none">
-            DRAG TO ROTATE
+          <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/70 border border-slate-700 text-[9px] font-mono text-amber-300 pointer-events-none flex items-center gap-1">
+            <Box className="w-2.5 h-2.5 text-amber-400" />
+            <span>3D DEMO RIG // DRAG TO ROTATE</span>
           </div>
         )}
       </div>
 
       {/* 3D vs 2D Toggle Control */}
-      <div className="mt-2.5 flex items-center gap-2">
+      <div className="mt-2.5 flex flex-col items-center gap-1.5">
         <button
           type="button"
           onClick={() => {
@@ -445,20 +468,26 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
               setLoadError(null)
             }
           }}
-          className="flex items-center gap-1.5 px-3 py-1 rounded bg-[#131728] hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-slate-700 hover:border-amber-500/40 text-[11px] font-gta tracking-wider transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#131728] hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-slate-700 hover:border-amber-500/40 text-[11px] font-gta tracking-wider transition-colors cursor-pointer shadow"
         >
           {viewMode === '3d' ? (
             <>
               <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
-              <span>SWITCH TO 2D PORTRAIT</span>
+              <span>RETURN TO VERIFIED PORTRAIT</span>
             </>
           ) : (
             <>
               <Box className="w-3.5 h-3.5 text-cyan-400" />
-              <span>SWITCH TO 3D AVATAR</span>
+              <span>VIEW 3D AVATAR RIG (DEMO)</span>
             </>
           )}
         </button>
+
+        {viewMode === '3d' && (
+          <p className="text-[10px] font-mono text-slate-500 text-center max-w-[220px] leading-tight">
+            *Generic humanoid 3D rig demonstrating WebGL & procedural lip sync. Switch to 2D for verified likeness.
+          </p>
+        )}
       </div>
     </div>
   )

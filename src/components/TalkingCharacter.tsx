@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { Character, ChatMessage } from '../types'
 import { dialogueData, matchUserIntent, conversationChoices } from '../data/dialogues'
 import { soundManager } from '../utils/audio'
@@ -20,6 +20,96 @@ import {
   Volume2,
 } from 'lucide-react'
 
+// Male and Female keyword hints for OS/browser speech voices
+const MALE_HINTS = [
+  'ravi',
+  'prabhat',
+  'david',
+  'guy',
+  'mark',
+  'george',
+  'james',
+  'andrew',
+  'ryan',
+  'brian',
+  'christopher',
+  'eric',
+  'liam',
+  'male',
+  'steffan',
+  'roger',
+]
+
+const FEMALE_HINTS = [
+  'heera',
+  'neerja',
+  'zira',
+  'jenny',
+  'aria',
+  'sonia',
+  'hazel',
+  'susan',
+  'catherine',
+  'female',
+  'eva',
+  'samantha',
+  'victoria',
+  'karen',
+  'anna',
+]
+
+interface RankedVoice {
+  voice: SpeechSynthesisVoice
+  isMaleHint: boolean
+  isIndian: boolean
+  score: number
+  label: string
+}
+
+function rankVoices(voices: SpeechSynthesisVoice[]): RankedVoice[] {
+  const englishVoices = voices.filter((v) => v.lang.toLowerCase().startsWith('en'))
+  const candidateVoices = englishVoices.length > 0 ? englishVoices : voices
+
+  return candidateVoices
+    .map((voice) => {
+      const nameLower = voice.name.toLowerCase()
+      const langLower = voice.lang.toLowerCase()
+
+      const isMale = MALE_HINTS.some((k) => nameLower.includes(k))
+      const isFemale = FEMALE_HINTS.some((k) => nameLower.includes(k))
+      const isIndian = langLower.includes('en-in') || nameLower.includes('india')
+
+      let score = 10
+      if (isMale && !isFemale) score += 60
+      if (isFemale) score -= 40
+
+      if (isIndian) {
+        score += isMale ? 50 : 15
+      } else if (langLower.includes('en-gb') || langLower.includes('en-us')) {
+        score += 20
+      }
+
+      if (nameLower.includes('natural') || nameLower.includes('online')) {
+        score += 10
+      }
+
+      let tag = ''
+      if (isIndian && isMale) tag = ' [Indian English • Male]'
+      else if (isIndian) tag = ' [Indian English]'
+      else if (isMale) tag = ' [Male Hint]'
+      else if (isFemale) tag = ' [Female Hint]'
+
+      return {
+        voice,
+        isMaleHint: isMale && !isFemale,
+        isIndian,
+        score,
+        label: `${voice.name}${tag}`,
+      }
+    })
+    .sort((a, b) => b.score - a.score)
+}
+
 interface TalkingCharacterProps {
   selectedCharacter: Character
   onNavigateSection: (sectionId: string) => void
@@ -34,6 +124,11 @@ export const TalkingCharacter: React.FC<TalkingCharacterProps> = ({
   const [voiceEnabled, setVoiceEnabled] = useState<boolean>(false)
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false)
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>('')
+  const [previewingVoice, setPreviewingVoice] = useState<boolean>(false)
+
+  // Rank available voices with priority for Indian English and male hints
+  const rankedVoices = useMemo(() => rankVoices(availableVoices), [availableVoices])
 
   // Chat & Conversation state
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => [
@@ -68,7 +163,7 @@ export const TalkingCharacter: React.FC<TalkingCharacterProps> = ({
     scrollToBottom()
   }, [chatHistory, displayedLatestText])
 
-  // Initialize SpeechSynthesis voices
+  // Initialize SpeechSynthesis voices asynchronously
   useEffect(() => {
     if (!speechSupported) return
 
@@ -76,6 +171,11 @@ export const TalkingCharacter: React.FC<TalkingCharacterProps> = ({
       const voices = window.speechSynthesis.getVoices()
       if (voices && voices.length > 0) {
         setAvailableVoices(voices)
+        setSelectedVoiceURI((prev) => {
+          if (prev && voices.some((v) => v.voiceURI === prev)) return prev
+          const ranked = rankVoices(voices)
+          return ranked.length > 0 ? ranked[0].voice.voiceURI : voices[0].voiceURI
+        })
       }
     }
 
@@ -90,15 +190,15 @@ export const TalkingCharacter: React.FC<TalkingCharacterProps> = ({
   }, [speechSupported])
 
   // Stop current utterance
-
   const stopSpeech = useCallback(() => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel()
     }
     setIsSpeaking(false)
+    setPreviewingVoice(false)
   }, [])
 
-  // Speak response using browser speech synthesis
+  // Speak response using browser speech synthesis with selected natural male voice
   const speakText = useCallback(
     (textToSpeak: string) => {
       if (!voiceEnabledRef.current || typeof window === 'undefined' || !('speechSynthesis' in window)) {
@@ -108,17 +208,17 @@ export const TalkingCharacter: React.FC<TalkingCharacterProps> = ({
       // Cancel previous playback first
       window.speechSynthesis.cancel()
       setIsSpeaking(false)
+      setPreviewingVoice(false)
 
       const utterance = new SpeechSynthesisUtterance(textToSpeak)
-      utterance.rate = 0.95
-      utterance.pitch = 1.0
+      utterance.rate = 0.95 // Natural, clear speaking rate
+      utterance.pitch = 0.95 // Grounded masculine pitch
 
-      // Select optimal voice: prefer English (India), natural, or English
+      // Select optimal voice based on user preference or highest male rank
       if (availableVoices.length > 0) {
         const preferredVoice =
-          availableVoices.find((v) => v.lang.includes('en-IN') || v.name.toLowerCase().includes('india')) ||
-          availableVoices.find((v) => v.name.includes('Natural') || v.name.includes('Online')) ||
-          availableVoices.find((v) => v.lang.startsWith('en')) ||
+          availableVoices.find((v) => v.voiceURI === selectedVoiceURI) ||
+          rankedVoices[0]?.voice ||
           availableVoices[0]
 
         if (preferredVoice) {
@@ -136,7 +236,6 @@ export const TalkingCharacter: React.FC<TalkingCharacterProps> = ({
       }
 
       utterance.onerror = (e) => {
-        // 'interrupted' or 'canceled' are normal when user stops or asks new question
         setIsSpeaking(false)
         if (e.error !== 'interrupted' && e.error !== 'canceled') {
           console.warn('Speech synthesis event error:', e.error)
@@ -145,8 +244,52 @@ export const TalkingCharacter: React.FC<TalkingCharacterProps> = ({
 
       window.speechSynthesis.speak(utterance)
     },
-    [availableVoices]
+    [availableVoices, selectedVoiceURI, rankedVoices]
   )
+
+  // Preview chosen voice with a short first-person sample
+  const previewVoice = useCallback(() => {
+    if (!speechSupported || typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      return
+    }
+
+    window.speechSynthesis.cancel()
+    setIsSpeaking(false)
+    setPreviewingVoice(true)
+
+    const previewSentence = "Hey there, I'm Chethan S. CIT Gubbi Computer Science student and developer."
+    const utterance = new SpeechSynthesisUtterance(previewSentence)
+    utterance.rate = 0.95
+    utterance.pitch = 0.95
+
+    if (availableVoices.length > 0) {
+      const preferredVoice =
+        availableVoices.find((v) => v.voiceURI === selectedVoiceURI) ||
+        rankedVoices[0]?.voice ||
+        availableVoices[0]
+
+      if (preferredVoice) {
+        utterance.voice = preferredVoice
+      }
+    }
+
+    utterance.onstart = () => {
+      setIsSpeaking(true)
+      setPreviewingVoice(true)
+    }
+
+    utterance.onend = () => {
+      setIsSpeaking(false)
+      setPreviewingVoice(false)
+    }
+
+    utterance.onerror = () => {
+      setIsSpeaking(false)
+      setPreviewingVoice(false)
+    }
+
+    window.speechSynthesis.speak(utterance)
+  }, [speechSupported, availableVoices, selectedVoiceURI, rankedVoices])
 
   // Clean up speech on unmount
   useEffect(() => {
@@ -409,6 +552,52 @@ export const TalkingCharacter: React.FC<TalkingCharacterProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Voice Selection & Preview Sub-bar */}
+        {speechSupported && (
+          <div className="px-4 sm:px-6 py-2.5 bg-black/45 border-b border-amber-500/20 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="font-gta text-[11px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+                <span>NARRATION VOICE:</span>
+              </span>
+
+              {/* Voice Selector Dropdown */}
+              <select
+                value={selectedVoiceURI}
+                onChange={(e) => setSelectedVoiceURI(e.target.value)}
+                className="bg-[#121626] border border-slate-700 hover:border-amber-500/50 text-slate-200 text-xs font-mono rounded px-2.5 py-1 focus:outline-none focus:border-amber-400 transition-colors max-w-[260px] sm:max-w-[340px] truncate cursor-pointer"
+                aria-label="Select speech narration voice"
+              >
+                {rankedVoices.length > 0 ? (
+                  rankedVoices.map((item) => (
+                    <option key={item.voice.voiceURI} value={item.voice.voiceURI}>
+                      {item.label}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">System Default Voice</option>
+                )}
+              </select>
+
+              {/* Preview Button */}
+              <button
+                type="button"
+                onClick={previewVoice}
+                disabled={previewingVoice}
+                title="Preview selected voice"
+                className="flex items-center gap-1 px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded text-[11px] font-mono tracking-wider transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <Volume2 className="w-3 h-3 text-amber-400" />
+                <span>{previewingVoice ? 'PREVIEWING...' : 'PREVIEW'}</span>
+              </button>
+            </div>
+
+            <span className="text-[10px] font-mono text-slate-400 hidden md:inline">
+              *Prioritizing natural male voices (rate 0.95 • pitch 0.95)
+            </span>
+          </div>
+        )}
 
         {/* Main Body: Portrait Column + Conversation Column */}
         <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
