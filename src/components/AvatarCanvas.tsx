@@ -1,12 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { Loader2, AlertCircle, Box, Image as ImageIcon } from 'lucide-react'
+import { Loader2, AlertCircle, Box, Image as ImageIcon, UserCheck } from 'lucide-react'
+
+type ViewMode = 'portrait' | 'photo' | '3d-demo'
 
 interface AvatarCanvasProps {
   isSpeaking: boolean
   fallbackImageUrl: string
   characterName: string
+  referenceOriginalImage?: string
   modelUrl?: string
 }
 
@@ -20,6 +23,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   isSpeaking,
   fallbackImageUrl,
   characterName,
+  referenceOriginalImage,
   modelUrl = '/assets/avatar.glb',
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -27,7 +31,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
 
   const [loading, setLoading] = useState<boolean>(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'3d' | 'portrait'>('portrait')
+  const [viewMode, setViewMode] = useState<ViewMode>('portrait')
 
   // Keep latest isSpeaking in ref for animation loop
   const isSpeakingRef = useRef<boolean>(isSpeaking)
@@ -79,7 +83,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
   }, [])
 
   useEffect(() => {
-    if (viewMode !== '3d' || !canvasRef.current || !containerRef.current) {
+    if (viewMode !== '3d-demo' || !canvasRef.current || !containerRef.current) {
       return
     }
 
@@ -381,42 +385,80 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
       {/* Stage Container */}
       <div
         ref={containerRef}
-        onPointerMove={handlePointerMove}
-        onPointerDown={handlePointerDown}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-        className={`relative w-48 h-64 sm:w-56 sm:h-76 rounded-xl overflow-hidden border-2 transition-all duration-300 bg-gradient-to-b from-[#141829] via-[#0c0e1a] to-black select-none cursor-grab active:cursor-grabbing ${
+        onPointerMove={viewMode === '3d-demo' ? handlePointerMove : undefined}
+        onPointerDown={viewMode === '3d-demo' ? handlePointerDown : undefined}
+        onPointerUp={viewMode === '3d-demo' ? handlePointerUp : undefined}
+        onPointerLeave={viewMode === '3d-demo' ? handlePointerUp : undefined}
+        className={`relative w-52 h-70 sm:w-60 sm:h-80 rounded-xl overflow-hidden border-2 transition-all duration-300 bg-gradient-to-b from-[#141829] via-[#0c0e1a] to-black select-none ${
+          viewMode === '3d-demo' ? 'cursor-grab active:cursor-grabbing' : ''
+        } ${
           isSpeaking ? 'border-amber-400 animate-speaking-glow' : 'border-amber-500/40 shadow-2xl'
         }`}
       >
-        {/* View Mode 1: Real 3D WebGL Canvas */}
-        {viewMode === '3d' && !loadError && (
-          <canvas
-            ref={canvasRef}
-            className="w-full h-full block focus:outline-none"
-            aria-label="3D Interactive Humanoid Avatar Rig"
-          />
-        )}
-
-        {/* View Mode 2 or Fallback: Chethan S Verified Illustrated Portrait */}
-        {(viewMode === 'portrait' || loadError) && (
-          <div className="w-full h-full relative">
+        {/* Mode 1: Chethan S Verified Illustrated Portrait (Default Identity) */}
+        {viewMode === 'portrait' && (
+          <div className="w-full h-full relative flex items-center justify-center bg-black/90 p-1">
             <img
               src={fallbackImageUrl}
-              alt={`Verified Portrait of ${characterName}`}
-              className="w-full h-full object-cover object-top filter brightness-105 animate-character-breath select-none"
+              alt={`${characterName} - Verified GTA V Illustrated Portrait`}
+              className="w-full h-full object-contain object-center filter brightness-105 animate-character-breath select-none"
             />
-            {loadError && (
-              <div className="absolute top-2 inset-x-2 py-1 px-2 bg-black/85 backdrop-blur-sm rounded border border-amber-500/50 flex items-center gap-1.5 text-[10px] font-mono text-amber-300">
-                <AlertCircle className="w-3 h-3 text-amber-400 shrink-0" />
-                <span>2D FALLBACK (3D MODEL LOAD FAILED)</span>
+          </div>
+        )}
+
+        {/* Mode 2: Chethan S Original Reference Photo */}
+        {viewMode === 'photo' && referenceOriginalImage && (
+          <div className="w-full h-full relative flex items-center justify-center bg-black/90 p-1">
+            <img
+              src={referenceOriginalImage}
+              alt={`${characterName} - Original Reference Photo`}
+              className="w-full h-full object-contain object-center filter brightness-105 select-none"
+            />
+            <div className="absolute top-2 inset-x-2 py-0.5 px-2 bg-black/80 backdrop-blur-sm rounded border border-emerald-500/50 flex items-center justify-center gap-1.5 text-[9px] font-mono text-emerald-300">
+              <span>ACTUAL UPLOADED PHOTO</span>
+            </div>
+          </div>
+        )}
+
+        {/* Mode 3: Generic 3D Rig Tech Demo */}
+        {viewMode === '3d-demo' && !loadError && (
+          <div className="w-full h-full relative">
+            <canvas
+              ref={canvasRef}
+              className="w-full h-full block focus:outline-none"
+              aria-label="3D Interactive Humanoid Avatar Rig"
+            />
+            <div className="absolute top-2 inset-x-2 py-0.5 px-1.5 bg-black/85 backdrop-blur-sm rounded border border-amber-500/50 flex items-center justify-center gap-1 text-[9px] font-mono text-amber-300 pointer-events-none">
+              <AlertCircle className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+              <span>3D TECH DEMO (GENERIC RIG // NOT CHETHAN S)</span>
+            </div>
+            {/* 3D Drag cue icon */}
+            {!loading && (
+              <div className="absolute top-8 left-2 px-1.5 py-0.5 rounded bg-black/70 border border-slate-700 text-[9px] font-mono text-amber-300 pointer-events-none flex items-center gap-1">
+                <Box className="w-2.5 h-2.5 text-amber-400" />
+                <span>DRAG TO ROTATE</span>
               </div>
             )}
           </div>
         )}
 
-        {/* Loading Overlay */}
-        {loading && viewMode === '3d' && !loadError && (
+        {/* Fallback if 3D load fails */}
+        {viewMode === '3d-demo' && loadError && (
+          <div className="w-full h-full relative flex items-center justify-center bg-black/90 p-1">
+            <img
+              src={fallbackImageUrl}
+              alt={`${characterName} - Verified Portrait`}
+              className="w-full h-full object-contain object-center filter brightness-105 select-none"
+            />
+            <div className="absolute top-2 inset-x-2 py-1 px-2 bg-black/85 backdrop-blur-sm rounded border border-amber-500/50 flex items-center gap-1.5 text-[10px] font-mono text-amber-300">
+              <AlertCircle className="w-3 h-3 text-amber-400 shrink-0" />
+              <span>2D FALLBACK (3D MODEL LOAD FAILED)</span>
+            </div>
+          </div>
+        )}
+
+        {/* Loading Overlay for 3D Demo */}
+        {loading && viewMode === '3d-demo' && !loadError && (
           <div className="absolute inset-0 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center p-4 text-center z-10">
             <Loader2 className="w-7 h-7 text-amber-400 animate-spin mb-2" />
             <span className="font-gta text-xs text-amber-400 tracking-wider font-bold">
@@ -428,7 +470,7 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
           </div>
         )}
 
-        {/* Real-time Status Badge: SPEAKING ONLY while voice narration is active */}
+        {/* Real-time Status Badge */}
         {isSpeaking ? (
           <div className="absolute bottom-2.5 inset-x-2.5 py-1 px-2 bg-black/90 backdrop-blur-md rounded border border-amber-400 flex items-center justify-center gap-1.5 shadow-lg z-20 pointer-events-none">
             <span className="w-1.5 h-3 bg-amber-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
@@ -439,53 +481,83 @@ export const AvatarCanvas: React.FC<AvatarCanvasProps> = ({
             </span>
           </div>
         ) : (
-          <div className="absolute bottom-2.5 inset-x-2.5 py-1 px-2 bg-black/80 backdrop-blur-sm rounded border border-slate-700/80 flex items-center justify-center gap-1.5 z-20 pointer-events-none">
+          <div className="absolute bottom-2.5 inset-x-2.5 py-1 px-2 bg-black/85 backdrop-blur-sm rounded border border-slate-700/80 flex items-center justify-center gap-1.5 z-20 pointer-events-none">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
             <span className="text-[10px] font-mono text-slate-300 tracking-wider">
-              {viewMode === '3d' ? '3D RIG // PROCEDURAL DEMO' : 'CHETHAN S // VERIFIED PORTRAIT'}
+              {viewMode === 'portrait'
+                ? 'CHETHAN S // VERIFIED PORTRAIT'
+                : viewMode === 'photo'
+                ? 'CHETHAN S // ORIGINAL PHOTO'
+                : 'GENERIC 3D RIG // TECH DEMO'}
             </span>
-          </div>
-        )}
-
-        {/* 3D Drag cue icon */}
-        {viewMode === '3d' && !loading && !loadError && (
-          <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/70 border border-slate-700 text-[9px] font-mono text-amber-300 pointer-events-none flex items-center gap-1">
-            <Box className="w-2.5 h-2.5 text-amber-400" />
-            <span>3D DEMO RIG // DRAG TO ROTATE</span>
           </div>
         )}
       </div>
 
-      {/* 3D vs 2D Toggle Control */}
-      <div className="mt-2.5 flex flex-col items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => {
-            const nextMode = viewMode === '3d' ? 'portrait' : '3d'
-            setViewMode(nextMode)
-            if (nextMode === '3d') {
+      {/* View Switcher Controls */}
+      <div className="mt-3 flex flex-col items-center gap-2 w-full max-w-[280px]">
+        <div className="flex items-center gap-1.5 p-1 bg-[#0d101c] border border-slate-800 rounded-lg w-full justify-center">
+          <button
+            type="button"
+            onClick={() => setViewMode('portrait')}
+            className={`flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded text-[10px] font-gta tracking-wider transition-colors cursor-pointer ${
+              viewMode === 'portrait'
+                ? 'bg-amber-500 text-black font-bold shadow'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ImageIcon className="w-3 h-3" />
+            <span>PORTRAIT</span>
+          </button>
+
+          {referenceOriginalImage && (
+            <button
+              type="button"
+              onClick={() => setViewMode('photo')}
+              className={`flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded text-[10px] font-gta tracking-wider transition-colors cursor-pointer ${
+                viewMode === 'photo'
+                  ? 'bg-amber-500 text-black font-bold shadow'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <UserCheck className="w-3 h-3" />
+              <span>PHOTO</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode('3d-demo')
               setLoading(true)
               setLoadError(null)
-            }
-          }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#131728] hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-slate-700 hover:border-amber-500/40 text-[11px] font-gta tracking-wider transition-colors cursor-pointer shadow"
-        >
-          {viewMode === '3d' ? (
-            <>
-              <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
-              <span>RETURN TO VERIFIED PORTRAIT</span>
-            </>
-          ) : (
-            <>
-              <Box className="w-3.5 h-3.5 text-cyan-400" />
-              <span>VIEW 3D AVATAR RIG (DEMO)</span>
-            </>
-          )}
-        </button>
+            }}
+            className={`flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded text-[10px] font-gta tracking-wider transition-colors cursor-pointer ${
+              viewMode === '3d-demo'
+                ? 'bg-cyan-500 text-black font-bold shadow'
+                : 'text-slate-400 hover:text-cyan-300'
+            }`}
+          >
+            <Box className="w-3 h-3" />
+            <span>3D DEMO</span>
+          </button>
+        </div>
 
-        {viewMode === '3d' && (
-          <p className="text-[10px] font-mono text-slate-500 text-center max-w-[220px] leading-tight">
-            *Generic humanoid 3D rig demonstrating WebGL & procedural lip sync. Switch to 2D for verified likeness.
+        {viewMode === 'portrait' && (
+          <p className="text-[10px] font-mono text-emerald-400/90 text-center leading-tight">
+            ✓ Verified GTA V portrait based on Chethan S's reference photo.
+          </p>
+        )}
+
+        {viewMode === 'photo' && (
+          <p className="text-[10px] font-mono text-slate-400 text-center leading-tight">
+            Original reference photograph of Chethan S.
+          </p>
+        )}
+
+        {viewMode === '3d-demo' && (
+          <p className="text-[10px] font-mono text-amber-400/90 text-center leading-tight">
+            *Generic WebGL procedural demo. Awaiting custom 3D photogrammetry scan.
           </p>
         )}
       </div>

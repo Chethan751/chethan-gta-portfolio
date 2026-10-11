@@ -608,6 +608,7 @@ export const TalkingCharacter: React.FC<TalkingCharacterProps> = ({
               isSpeaking={isSpeaking}
               fallbackImageUrl={selectedCharacter.portraitImage}
               characterName={selectedCharacter.name}
+              referenceOriginalImage={selectedCharacter.referenceOriginalImage}
             />
 
             {/* Identity Details */}
