@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import type { Character, ChatMessage } from '../types'
 import { dialogueData, matchUserIntent, conversationChoices } from '../data/dialogues'
 import { soundManager } from '../utils/audio'
+import { AvatarCanvas } from './AvatarCanvas'
+
 import {
   Mic,
   MicOff,
@@ -412,39 +414,12 @@ export const TalkingCharacter: React.FC<TalkingCharacterProps> = ({
         <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column: Alive Character Portrait */}
           <div className="lg:col-span-4 flex flex-col items-center text-center">
-            <div
-              className={`relative w-44 h-56 sm:w-52 sm:h-64 rounded-xl overflow-hidden border-2 transition-all duration-300 bg-black ${
-                isSpeaking
-                  ? 'border-amber-400 animate-speaking-glow'
-                  : 'border-amber-500/40 shadow-2xl'
-              }`}
-            >
-              {/* Alive subtle breathing effect */}
-              <img
-                src={selectedCharacter.portraitImage}
-                alt={`Chethan S - ${selectedCharacter.roleTitle}`}
-                className="w-full h-full object-cover filter brightness-105 animate-character-breath select-none"
-              />
-
-              {/* Status Badge: SPEAKING ONLY while narration audio is active! */}
-              {isSpeaking ? (
-                <div className="absolute bottom-2.5 inset-x-2.5 py-1 px-2 bg-black/90 backdrop-blur-md rounded border border-amber-400 flex items-center justify-center gap-1.5 shadow-lg">
-                  <span className="w-1.5 h-3 bg-amber-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                  <span className="w-1.5 h-5 bg-amber-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                  <span className="w-1.5 h-3 bg-amber-400 rounded-full animate-bounce" />
-                  <span className="text-[11px] font-mono font-black text-amber-300 tracking-wider ml-1">
-                    SPEAKING
-                  </span>
-                </div>
-              ) : (
-                <div className="absolute bottom-2.5 inset-x-2.5 py-1 px-2 bg-black/80 backdrop-blur-sm rounded border border-slate-700/80 flex items-center justify-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  <span className="text-[10px] font-mono text-slate-300 tracking-wider">
-                    ONLINE // READY
-                  </span>
-                </div>
-              )}
-            </div>
+            {/* 3D Talking Avatar Canvas with fallback & 2D toggle */}
+            <AvatarCanvas
+              isSpeaking={isSpeaking}
+              fallbackImageUrl={selectedCharacter.portraitImage}
+              characterName={selectedCharacter.name}
+            />
 
             {/* Identity Details */}
             <div className="mt-3.5 space-y-1">
