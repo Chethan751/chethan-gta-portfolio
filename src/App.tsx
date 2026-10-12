@@ -3,15 +3,15 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { Intro } from './components/Intro'
 import { Navbar } from './components/Navbar'
 import { HeroSection } from './components/HeroSection'
-import { CharacterSelection } from './components/CharacterSelection'
-import { TalkingCharacter } from './components/TalkingCharacter'
-import { SkillsSection } from './components/SkillsSection'
-import { MissionsSection } from './components/MissionsSection'
 import { EducationSection } from './components/EducationSection'
+import { SkillsSection } from './components/SkillsSection'
+import { JourneyTimeline } from './components/JourneyTimeline'
+import { MissionsSection } from './components/MissionsSection'
+import { TalkingCharacter } from './components/TalkingCharacter'
+import { CharacterSelection } from './components/CharacterSelection'
 import { AchievementsSection } from './components/AchievementsSection'
-import { ContactSection } from './components/ContactSection'
+import { ClosingSection } from './components/ClosingSection'
 import { ConfigEditorModal } from './components/ConfigEditorModal'
-import { Footer } from './components/Footer'
 
 import { initialSiteConfig } from './data/siteConfig'
 import { characters } from './data/characters'
@@ -21,7 +21,6 @@ import { projectMissions } from './data/projects'
 import { initialAchievements } from './data/achievements'
 import { soundManager } from './utils/audio'
 import type { Character, Skill, SiteConfig } from './types'
-
 
 export function App() {
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(initialSiteConfig)
@@ -41,7 +40,7 @@ export function App() {
 
   // IntersectionObserver to track active section for Navbar HUD
   useEffect(() => {
-    const sectionIds = ['home', 'character', 'about', 'skills', 'missions', 'education', 'achievements', 'contact']
+    const sectionIds = ['home', 'education', 'skills', 'journey', 'missions', 'about', 'character', 'achievements', 'contact']
     const observers: IntersectionObserver[] = []
 
     sectionIds.forEach((id) => {
@@ -110,14 +109,13 @@ export function App() {
 
   return (
     <ErrorBoundary>
-      <div className="relative min-h-screen bg-[#0a0b10] text-slate-100 overflow-x-hidden">
-        {/* Intro sequence */}
+      <div className="relative min-h-screen bg-[#07080d] text-slate-100 overflow-x-hidden">
+        {/* Intro sequence: Scene 1 Controlled Cinematic Opening */}
         {!introDismissed && (
           <Intro
             onEnter={handleDismissIntro}
             displayName={siteConfig.displayName}
-            subtitle={siteConfig.subtitle}
-            tagline={siteConfig.tagline}
+            subtitle="WELCOME TO MY WORLD"
           />
         )}
 
@@ -129,10 +127,10 @@ export function App() {
           <img
             src={activeEnvironment.backgroundImage}
             alt=""
-            className="w-full h-full object-cover transition-opacity duration-1000 filter brightness-90"
-            style={{ opacity: 0.18 }}
+            className="w-full h-full object-cover transition-opacity duration-1000 filter brightness-75"
+            style={{ opacity: 0.2 }}
           />
-          <div className="absolute inset-0 bg-[#0a0b10]/90" />
+          <div className="absolute inset-0 bg-[#07080d]/85" />
           <div className="absolute inset-0 scanlines opacity-15" />
         </div>
 
@@ -146,8 +144,9 @@ export function App() {
           onOpenConfigEditor={() => setConfigEditorOpen(true)}
         />
 
-        {/* Main Sections */}
+        {/* Main 7 Scenes Flow */}
         <main className="relative z-10">
+          {/* Scene 1: Master Title & Character Hero */}
           <HeroSection
             displayName={siteConfig.displayName}
             subtitle={siteConfig.subtitle}
@@ -157,17 +156,10 @@ export function App() {
             onNavigate={handleNavigate}
           />
 
-          <CharacterSelection
-            characters={characters}
-            selectedCharacter={selectedCharacter}
-            onSelectCharacter={handleSelectCharacter}
-          />
+          {/* Scene 2: Education */}
+          <EducationSection education={siteConfig.education} />
 
-          <TalkingCharacter
-            selectedCharacter={selectedCharacter}
-            onNavigateSection={handleNavigate}
-          />
-
+          {/* Scene 3: Skills Environment */}
           <SkillsSection
             skills={initialSkills}
             activeSkillId={activeSkillId}
@@ -175,25 +167,36 @@ export function App() {
             environments={environments}
           />
 
+          {/* Scene 4: Journey Timeline */}
+          <JourneyTimeline />
+
+          {/* Scene 5: Project Gallery (Three distinct environments) */}
           <MissionsSection missions={projectMissions} />
 
-          <EducationSection education={siteConfig.education} />
+          {/* Scene 6: Talking Character (Open-Ended AI + Speech) */}
+          <TalkingCharacter
+            selectedCharacter={selectedCharacter}
+            onNavigateSection={handleNavigate}
+          />
+
+          {/* Complementary Identity Wheels & Integrity Badges */}
+          <CharacterSelection
+            characters={characters}
+            selectedCharacter={selectedCharacter}
+            onSelectCharacter={handleSelectCharacter}
+          />
 
           <AchievementsSection achievements={initialAchievements} />
 
-          <ContactSection
+          {/* Scene 7: Closing Scene with Skyline, dramatic red lighting & sports car atmosphere */}
+          <ClosingSection
+            displayName={siteConfig.displayName}
             contactLinks={siteConfig.contactLinks}
             location={siteConfig.location}
-            displayName={siteConfig.displayName}
+            onReplayIntro={handleReplayIntro}
+            onScrollTop={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           />
         </main>
-
-        {/* Footer */}
-        <Footer
-          onReplayIntro={handleReplayIntro}
-          onScrollTop={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          displayName={siteConfig.displayName}
-        />
 
         {/* Live Config Editor Modal */}
         <ConfigEditorModal

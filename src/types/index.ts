@@ -34,6 +34,7 @@ export interface Skill {
   backgroundImage: string
   enabled: boolean
   sortOrder: number
+  concepts?: string[]
 }
 
 export interface ConversationChoice {
@@ -50,6 +51,8 @@ export interface ChatMessage {
   text: string
   timestamp?: string
   targetSectionId?: string
+  source?: 'openrouter' | 'local'
+  model?: string
 }
 
 export interface DialogueTopic {
